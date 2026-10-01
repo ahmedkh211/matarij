@@ -479,6 +479,56 @@ async function doDelete(r) {
 }
 
 /* ---------- upload ---------- */
+const MAX_UPLOAD_BYTES = 50 * 1048576;
+
+function uploadHint(err) {
+  const raw = ((err && err.message) || "").trim();
+  const m = raw.toLowerCase();
+  if (!raw) return ["الرفع فشل من غير سبب واضح.", ""];
+  if (m.indexOf("fetch") >= 0 || m.indexOf("network") >= 0 || m.indexOf("load failed") >= 0)
+    return ["مفيش اتصال بخادم الملفات. جرّب شبكة تانية: Wi-Fi بدل بيانات الموبايل، واقفِل أي VPN أو فلتر.", raw];
+  if (m.indexOf("row-level security") >= 0)
+    return ["الموقع مش مسموح له يكتب في القاعدة. اعمل تحديث للصفحة (سحب لتحت) وجرّب تاني.", raw];
+  if (m.indexOf("maximum allowed size") >= 0 || m.indexOf("too large") >= 0)
+    return ["الملف كبير أوي على الحد المسموح (تقريبًا 50 ميجا). صغّره وجرّب.", raw];
+  if (m.indexOf("timeout") >= 0 || m.indexOf("انتهت مهلة") >= 0)
+    return ["الاتصال بطيء والوقت خلص قبل ما الملف يوصل. جرّب تاني أو صغّر الملف.", raw];
+  if (m.indexOf("already exists") >= 0)
+    return ["فيه ملف بنفس الاسم في نفس الأسبوع. غيّر اسم الملف وجرّب.", raw];
+  return ["الرفع فشل. جرّب تاني، ولو فشل برضه ابعتي الكلام اللي تحت.", raw];
+}
+
+function showUploadError(st, err) {
+  const parts = uploadHint(err);
+  st.innerHTML = "";
+  st.appendChild(el("div", null, parts[0]));
+  if (parts[1]) {
+    const d = el("div", null, "تفاصيل: " + parts[1]);
+    d.style.marginTop = "6px";
+    d.style.fontSize = "0.72rem";
+    d.style.opacity = "0.7";
+    d.style.wordBreak = "break-all";
+    st.appendChild(d);
+  }
+}
+
+async function uploadWithRetry(path, file, attempts) {
+  let last = null;
+  for (let i = 0; i < attempts; i++) {
+    const res = await withTimeout(
+      sb.storage.from(BUCKET).upload(path, file, { contentType: "application/pdf", upsert: true }),
+      90000, { error: { message: "انتهت مهلة الرفع" } }
+    );
+    if (!res.error) return res;
+    last = res.error;
+    const m = String((last && last.message) || "").toLowerCase();
+    const retriable = m.indexOf("fetch") >= 0 || m.indexOf("network") >= 0 || m.indexOf("load failed") >= 0 || m.indexOf("timeout") >= 0 || m.indexOf("انتهت مهلة") >= 0;
+    if (!retriable) break;
+    await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+  }
+  return { error: last };
+}
+
 async function doUpload() {
   const st = $("#upStatus");
   const subject = $("#upSubject").value;
@@ -489,26 +539,27 @@ async function doUpload() {
   if (!week || week < 1 || week > 52) { st.textContent = "اكتب رقم أسبوع من 1 إلى 52."; return; }
   if (!file) { st.textContent = "اختر ملف PDF."; return; }
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { st.textContent = "الملف لازم يكون PDF."; return; }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    st.textContent = "حجم الملف " + fileSize(file.size) + " وده أكبر من الحد (50 ميجا). صغّره وجرّب تاني.";
+    return;
+  }
 
   const btn = $("#uploadBtn");
   btn.disabled = true;
-  st.textContent = "جاري الرفع...";
+  st.textContent = "جاري الرفع... (" + fileSize(file.size) + ")";
 
-  const safe = file.name.replace(/[\\/:*?"<>|]+/g, "-");
+  const safe = file.name.replace(/[\\/:*?"<>|#%\s]+/g, "-").slice(0, 80);
   const path = subject + "/" + week + "-" + Date.now() + "-" + safe;
   const label = typedName || file.name.replace(/\.pdf$/i, "");
 
-  const up = await withTimeout(
-    sb.storage.from(BUCKET).upload(path, file, { contentType: "application/pdf", upsert: true }),
-    90000, { error: { message: "انتهت مهلة الرفع" } }
-  );
-  if (up.error) { st.textContent = "فشل الرفع: " + up.error.message; btn.disabled = false; return; }
+  const up = await uploadWithRetry(path, file, 3);
+  if (up.error) { showUploadError(st, up.error); btn.disabled = false; return; }
 
   const save = await withTimeout(
     sb.from("pdfs").insert({ subject, week, name: label, path, size: file.size }),
     20000, { error: { message: "انتهت المهلة" } }
   );
-  if (save.error) { st.textContent = "فشل الحفظ: " + save.error.message; btn.disabled = false; return; }
+  if (save.error) { st.textContent = "الملف اترفع فعلاً بس مقدرش يتسجّل في القائمة: " + save.error.message; btn.disabled = false; return; }
 
   btn.disabled = false;
   $("#upFile").value = "";
