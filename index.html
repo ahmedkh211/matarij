@@ -292,6 +292,7 @@ html[data-style="liquid"] .seg button.on{color:#fff}
           <button type="button" data-style-val="soft">ناعم ✨</button>
           <button type="button" data-style-val="liquid">زجاج سائل 💧</button>
           <button type="button" data-style-val="school">المدرسة 🏫</button>
+          <button type="button" data-style-val="storm">العاصفة ⚡</button>
         </div>
       </div>
 
@@ -619,7 +620,7 @@ async function loadRows() {
 /* ---------- rendering ---------- */
 function stagger(nodes, start) {
   if (reduceMotion()) return;
-  nodes.forEach((n, i) => { n.style.animationDelay = (start + i * 45) + "ms"; });
+  Array.prototype.forEach.call(nodes, (n, i) => { n.style.animationDelay = (start + i * 45) + "ms"; });
 }
 
 function render() {
