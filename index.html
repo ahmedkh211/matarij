@@ -16,6 +16,7 @@
   --shadow:0 1px 2px rgba(16,24,40,.06), 0 10px 28px rgba(16,24,40,.07);
   --radius:14px; --radius-sm:10px; --blur:none; --glow:none;
   --ring:0 0 0 4px rgba(31,111,235,.16);
+  --ring-soft:0 0 0 1px rgba(31,111,235,.18), 0 14px 34px rgba(16,24,40,.09);
   --anim:1;
 }
 html[data-theme="dark"]{
@@ -23,6 +24,7 @@ html[data-theme="dark"]{
   --primary:#5c9cff; --primary-weak:#15243d; --danger:#ff6f6f; --ok:#3ec27f;
   --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 28px rgba(0,0,0,.4);
   --ring:0 0 0 4px rgba(92,156,255,.2);
+  --ring-soft:0 0 0 1px rgba(92,156,255,.26), 0 14px 34px rgba(0,0,0,.5);
 }
 
 /* ===== storm: lightning + dark ===== */
@@ -31,10 +33,11 @@ html[data-style="storm"]{
   --primary:#ffd83d; --primary-weak:#2a2612; --danger:#ff6b6b; --ok:#4ee39a;
   --shadow:0 12px 30px rgba(0,0,0,.55);
   --ring:0 0 0 4px rgba(255,216,61,.22);
+  --ring-soft:0 0 0 1px rgba(255,216,61,.3), 0 16px 38px rgba(0,0,0,.6);
   --radius:16px; --radius-sm:10px;
   --glow:0 0 22px rgba(255,216,61,.18);
 }
-html[data-style="storm"] body::after{
+html[data-style="storm"] body::before{
   content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(900px 500px at 78% -8%,rgba(255,216,61,.10),transparent 62%),
              radial-gradient(700px 420px at 12% 108%,rgba(90,140,255,.12),transparent 62%);
@@ -57,6 +60,14 @@ body{
   background-attachment:fixed;
 }
 body>*{position:relative;z-index:1}
+
+/* falling meteors (dark mode only, driven by JS) */
+#sky{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  opacity:0;transition:opacity .6s ease;
+}
+html[data-theme="dark"] #sky{opacity:1}
+
 button{font-family:inherit;cursor:pointer}
 .wrap{max-width:1000px;margin:0 auto;padding:0 16px}
 
@@ -88,20 +99,37 @@ main{padding:20px 0 80px}
   display:flex;align-items:center;gap:12px;width:100%;
   color:var(--text);font-size:1rem;font-weight:600;
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
-  transition:transform .16s ease, box-shadow .2s ease, border-color .2s ease;
+  position:relative;overflow:hidden;
+  transition:transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .22s ease, border-color .22s ease;
   animation:riseIn .42s cubic-bezier(.2,.7,.3,1) both;
 }
-.card:hover{border-color:var(--primary);transform:translateY(-3px);box-shadow:var(--shadow),var(--glow)}
+.card::after{
+  content:"";position:absolute;inset-inline:0;top:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);
+  opacity:.75;
+}
+.card:hover{border-color:var(--primary);transform:translateY(-3px);box-shadow:var(--shadow),var(--glow),var(--ring-soft)}
 .card:active{transform:translateY(-1px) scale(.985)}
 .card .dot{
-  width:40px;height:40px;flex:none;border-radius:12px;background:var(--primary-weak);
-  display:grid;place-items:center;font-size:1.25rem;line-height:1;
+  width:4px;height:34px;flex:none;border-radius:99px;
+  background:linear-gradient(180deg,var(--primary),transparent);
+  opacity:.9;
 }
-.card .cnt{margin-inline-start:auto;color:var(--muted);font-size:.78rem;font-weight:500}
+.card .cnt{margin-inline-start:auto;color:var(--muted);font-size:.78rem;font-weight:500;letter-spacing:.1px}
+
+/* "new since your last visit" dot on a subject card */
+.card .newdot{
+  width:8px;height:8px;flex:none;border-radius:99px;background:var(--primary);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent),
+             0 0 12px color-mix(in srgb, var(--primary) 70%, transparent);
+  animation:pulseDot 2.4s ease-in-out infinite;
+}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.82)}}
 
 .week{margin-bottom:22px;animation:riseIn .42s cubic-bezier(.2,.7,.3,1) both}
 .week-head{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:.95rem;font-weight:700;color:var(--muted)}
 .week-head .n{background:var(--primary-weak);color:var(--primary);border-radius:var(--radius-sm);padding:3px 10px;font-size:.8rem}
+.week-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
 .list{display:grid;gap:10px}
 
 .row{
@@ -109,13 +137,29 @@ main{padding:20px 0 80px}
   display:flex;align-items:center;gap:12px;padding:12px 14px;
   box-shadow:var(--shadow),var(--glow);
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  position:relative;
   animation:riseIn .4s cubic-bezier(.2,.7,.3,1) both;
-  transition:transform .16s ease, box-shadow .2s ease;
+  transition:transform .16s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
 }
 .row:hover{transform:translateX(-3px)}
 .row .meta{flex:1;min-width:0}
 .row .meta b{display:block;font-size:.98rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .meta small{color:var(--muted);font-size:.75rem}
+
+/* not yet opened by this person: brighter + accent edge */
+.row.unread{
+  background:color-mix(in srgb, var(--primary) 7%, var(--card));
+  border-color:color-mix(in srgb, var(--primary) 34%, var(--border));
+}
+.row.unread::before{
+  content:"";position:absolute;inset-block:8px;inset-inline-start:0;width:3px;
+  border-radius:99px;background:var(--primary);opacity:.9;
+}
+.row .newdot{
+  width:8px;height:8px;flex:none;border-radius:99px;background:var(--primary);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+  animation:pulseDot 2.4s ease-in-out infinite;
+}
 .acts{display:flex;gap:8px;flex-wrap:wrap}
 
 .btn{
@@ -197,6 +241,19 @@ html[data-style="storm"] .seg button.on{color:#171208}
   transition:transform .12s ease;
 }
 .zoombtn:active{transform:scale(.92)}
+.closebtn{padding-inline:14px;font-weight:600;letter-spacing:.2px}
+
+/* version tag: pinned to the bottom-left corner, independent of text direction */
+#versionTag{
+  position:fixed;left:14px;bottom:10px;z-index:5;
+  direction:ltr;unicode-bidi:isolate;
+  font-size:.72rem;font-weight:700;letter-spacing:.6px;
+  color:var(--muted);opacity:.75;
+  padding:4px 9px;border-radius:var(--radius-sm);
+  background:color-mix(in srgb, var(--card) 70%, transparent);
+  border:1px solid var(--border);
+  pointer-events:none;user-select:none;
+}
 
 @keyframes riseIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
@@ -218,6 +275,7 @@ html[data-style="storm"] .seg button.on{color:#171208}
 </head>
 <body>
 
+<canvas id="sky" aria-hidden="true"></canvas>
 <div class="flash" id="flash"></div>
 
 <header>
@@ -244,7 +302,7 @@ html[data-style="storm"] .seg button.on{color:#171208}
         <label>ستايل الموقع</label>
         <div class="grid2" id="styleSeg">
           <button type="button" data-style-val="modern">عادي</button>
-          <button type="button" data-style-val="storm">العاصفة ⚡</button>
+          <button type="button" data-style-val="storm">العاصفة</button>
         </div>
       </div>
 
@@ -258,19 +316,10 @@ html[data-style="storm"] .seg button.on{color:#171208}
         <div class="hint" id="themeHint"></div>
       </div>
 
-      <div class="field">
-        <label>أصوات الضغط</label>
-        <div class="seg" id="soundSeg">
-          <button type="button" data-sound-val="on">تشغيل 🔊</button>
-          <button type="button" data-sound-val="off">إيقاف 🔇</button>
-        </div>
-        <div class="hint">نقرة خفيفة لما تدوس على الأزرار.</div>
-      </div>
-
       <hr style="border:none;border-top:1px solid var(--border);margin:6px 0 16px">
       <p class="hint" style="margin:0 0 12px;font-size:.85rem;color:var(--text)">عندك ملفات جديدة ترفعها؟</p>
-      <button class="btn wide" id="openUploadDlg" type="button">⬆ الرفع</button>
-      <div class="hint" id="connStatus" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">⏳ بنفحص الاتصال...</div>
+      <button class="btn wide" id="openUploadDlg" type="button">رفع ملف جديد</button>
+      <div class="hint" id="connStatus" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">بنفحص الاتصال...</div>
       <div class="hint" id="buildTag" style="margin-top:6px;opacity:.65"></div>
     </div>
   </div>
@@ -307,8 +356,9 @@ html[data-style="storm"] .seg button.on{color:#171208}
         <select id="upSubject"></select>
       </div>
       <div class="field">
-        <label>رقم الأسبوع</label>
-        <input id="upWeek" type="number" min="1" max="52" step="1" placeholder="مثال: 3">
+        <label>رقم الأسبوع (اختياري)</label>
+        <input id="upWeek" type="number" min="0" max="52" step="1" placeholder="سيبه فاضي لو مش مرتبط بأسبوع">
+        <div class="hint">لو سايبه فاضي الملف هيبقى في مجموعة «بدون تحديد أسبوع».</div>
       </div>
       <div class="field">
         <label>اسم الملف</label>
@@ -318,7 +368,7 @@ html[data-style="storm"] .seg button.on{color:#171208}
       <div class="field">
         <label>الملف (PDF)</label>
         <input id="upFile" type="file" accept="application/pdf,.pdf">
-        <div class="hint">تقدر ترفع أكتر من ملف لنفس الأسبوع، وكل ملف باسمه.</div>
+        <div class="hint">تقدر ترفع أكتر من ملف، وكل ملف باسمه.</div>
       </div>
       <button class="btn wide" id="uploadBtn" type="button">تأكيد ورفع</button>
       <div class="status" id="upStatus"></div>
@@ -333,20 +383,21 @@ html[data-style="storm"] .seg button.on{color:#171208}
     <button class="zoombtn" id="zoomOut" type="button">−</button>
     <span class="hint" id="zoomLabel" style="margin:0">100%</span>
     <button class="zoombtn" id="zoomIn" type="button">+</button>
-    <button class="zoombtn" id="viewerClose" type="button">✕</button>
+<button class="zoombtn closebtn" id="viewerClose" type="button" aria-label="إغلاق">إغلاق</button>
   </div>
-  <div class="viewer-body" id="viewerBody">
+  <div class="viewer-body" id="viewerFrameWrap">
     <iframe id="viewerFrame" title="عارض الملف"></iframe>
   </div>
   <div class="viewer-tools">
-    <a class="btn" id="dlBtn" href="#"><span>تحميل الملف</span> ⬇</a>
-    <a class="btn ghost" id="openBtn" target="_blank" rel="noopener" href="#"><span>فتح في تاب جديد</span> ↗</a>
+    <a class="btn" id="dlBtn" href="#"><span>تحميل الملف</span></a>
+    <a class="btn ghost" id="openBtn" target="_blank" rel="noopener" href="#"><span>فتح في تاب جديد</span></a>
     <div class="sp"></div>
     <span class="hint" style="margin:0">لو التحميل بطيء، افتحه في تاب جديد.</span>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="versionTag"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <script>
@@ -355,22 +406,24 @@ const CONFIG = {
   supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFob3JuYW15dWpsaHJ0em9nZXB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MDYxMjgsImV4cCI6MjEwNjI4MjEyOH0.YI3C4389-LH4DH8hN_o8aOqQqRRQU4cXZRgKqRS0hk8",
   uploadPassword: "Khazft2011",
   subjects: [
-    { id: "arabic",  name: "اللغة العربية",        icon: "📖" },
-    { id: "religion",name: "التربية الدينية",        icon: "🕌" },
-    { id: "math",    name: "الرياضيات",            icon: "📐" },
-    { id: "science", name: "العلوم المتكاملة",      icon: "🔬" },
-    { id: "history", name: "التاريخ",              icon: "🏛️" },
-    { id: "computing",name:"البرمجة والحاسب",       icon: "💻" },
-    { id: "logic",   name: "الفلسفة والمنطق",       icon: "🧠" },
-    { id: "english", name: "اللغة الإنجليزية",      icon: "🔤" },
-    { id: "german",  name: "اللغة الألمانية",       icon: "🔠" }
+    { id: "arabic",  name: "اللغة العربية" },
+    { id: "religion",name: "التربية الدينية" },
+    { id: "math",    name: "الرياضيات" },
+    { id: "science", name: "العلوم المتكاملة" },
+    { id: "history", name: "التاريخ" },
+    { id: "computing",name:"البرمجة والحاسب" },
+    { id: "logic",   name: "الفلسفة والمنطق" },
+    { id: "english", name: "اللغة الإنجليزية" },
+    { id: "german",  name: "اللغة الألمانية" }
   ]
 };
 
 const SUBJECTS = CONFIG.subjects;
 const BUCKET = "pdfs";
-const BUILD = "r4-2026-10-01";
+const BUILD = "r5-2026-10-07";
+const VERSION = "1.0 Beta";
 const LS_SETTINGS = "matarij.settings";
+const LS_SEEN = "matarij.seen";
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
 const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -402,53 +455,63 @@ let authed = false;
 let zoom = 100;
 let current = null;
 
-/* ---------- sound ---------- */
-let audioCtx = null;
-function playClick(kind) {
-  if (getSettings().sound !== "on") return;
-  try {
-    if (!audioCtx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      audioCtx = new AC();
-    }
-    if (audioCtx.state === "suspended") audioCtx.resume();
-    const now = audioCtx.currentTime;
-
-    const gain = audioCtx.createGain();
-    gain.connect(audioCtx.destination);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(kind === "open" ? 0.05 : 0.035, now + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-
-    const osc = audioCtx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(kind === "open" ? 520 : 380, now);
-    osc.frequency.exponentialRampToValueAtTime(kind === "open" ? 300 : 210, now + 0.08);
-    osc.connect(gain);
-    osc.start(now);
-    osc.stop(now + 0.1);
-
-    const buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.03), audioCtx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buf;
-    const ng = audioCtx.createGain();
-    ng.gain.value = 0.02;
-    noise.connect(ng); ng.connect(audioCtx.destination);
-    noise.start(now);
-  } catch (e) { /* ignore */ }
+/* ---------- upload / delete password ---------- */
+function checkPassword() {
+  return $("#passIn").value === CONFIG.uploadPassword;
 }
-document.addEventListener("pointerdown", (e) => {
-  const t = e.target;
-  if (t && t.closest && t.closest("button,a,.seg button,.card")) playClick("tap");
-}, { passive: true });
+function requirePassword(cb) {
+  if (authed) { cb(); return; }
+  $("#passIn").value = "";
+  $("#passStatus").textContent = "";
+  $("#passDlg").showModal();
+  const onOk = () => {
+    if (checkPassword()) { authed = true; $("#passDlg").close(); cb(); }
+    else $("#passStatus").textContent = "كلمة المرور غير صحيحة";
+  };
+  $("#verifyBtn").onclick = onOk;
+  $("#passIn").onkeydown = (e) => { if (e.key === "Enter") onOk(); };
+  setTimeout(() => { const p = $("#passIn"); if (p) p.focus(); }, 60);
+}
+
+/* ---------- per-device "what is new" tracking ---------- */
+function getSeen() {
+  let v = { visited: {}, read: {} };
+  try { v = Object.assign(v, JSON.parse(localStorage.getItem(LS_SEEN) || "{}")); } catch (e) { /* fresh */ }
+  if (!v.visited || typeof v.visited !== "object") v.visited = {};
+  if (!v.read || typeof v.read !== "object") v.read = {};
+  return v;
+}
+function saveSeen(v) {
+  try { localStorage.setItem(LS_SEEN, JSON.stringify(v)); } catch (e) { /* ignore */ }
+}
+/* a file is unread until this device actually opens or downloads it */
+function isUnread(r) { return !getSeen().read[r.id]; }
+/* the subject card dot clears when you enter the subject, and comes back
+   if anything is uploaded after that visit */
+function hasNewIn(subjectId) {
+  const seen = getSeen();
+  const since = seen.visited[subjectId] || 0;
+  return rows.some((r) => r.subject === subjectId
+    && new Date(r.created_at).getTime() > since
+    && !seen.read[r.id]);
+}
+function markVisited(subjectId) {
+  const v = getSeen();
+  v.visited[subjectId] = Date.now();
+  saveSeen(v);
+}
+function markRead(id) {
+  const v = getSeen();
+  v.read[id] = Date.now();
+  const keys = Object.keys(v.read);
+  if (keys.length > 400) keys.sort((a, b) => v.read[a] - v.read[b]).slice(0, keys.length - 400).forEach((k) => { delete v.read[k]; });
+  saveSeen(v);
+}
 
 /* ---------- settings ---------- */
 function getSettings() {
-  try { return Object.assign({ theme: "auto", style: "modern", sound: "on" }, JSON.parse(localStorage.getItem(LS_SETTINGS) || "{}")); }
-  catch (e) { return { theme: "auto", style: "modern", sound: "on" }; }
+  try { return Object.assign({ theme: "auto", style: "modern" }, JSON.parse(localStorage.getItem(LS_SETTINGS) || "{}")); }
+  catch (e) { return { theme: "auto", style: "modern" }; }
 }
 function saveSettings(s) { localStorage.setItem(LS_SETTINGS, JSON.stringify(s)); }
 
@@ -464,7 +527,6 @@ function applyLook() {
 
   document.querySelectorAll("#styleSeg button").forEach((b) => b.classList.toggle("on", b.dataset.styleVal === style));
   document.querySelectorAll("#themeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.themeVal === s.theme));
-  document.querySelectorAll("#soundSeg button").forEach((b) => b.classList.toggle("on", b.dataset.soundVal === s.sound));
 
   const fixed = (style === "storm");
   const tf = $("#themeField");
@@ -473,6 +535,7 @@ function applyLook() {
   if (th) th.textContent = fixed ? "العاصفة بتفرض لونها، فمفيش حاجة تختار فاتح ولا داكن." : "";
 
   if (style === "storm" && !reduceMotion()) scheduleLightning();
+  updateSky();
 }
 function initLook() {
   applyLook();
@@ -489,6 +552,111 @@ function scheduleLightning() {
   }, 6000 + Math.random() * 9000);
 }
 
+/* ---------- falling meteors (dark mode) ---------- */
+const sky = {
+  cv: null, ctx: null, w: 0, h: 0, dpr: 1,
+  bits: [], raf: 0, last: 0, next: 0, running: false
+};
+function skyOn() {
+  return document.documentElement.dataset.theme === "dark" && !reduceMotion() && !document.hidden;
+}
+function skySize() {
+  const cv = sky.cv;
+  if (!cv) return;
+  sky.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  sky.w = window.innerWidth;
+  sky.h = window.innerHeight;
+  cv.width = Math.round(sky.w * sky.dpr);
+  cv.height = Math.round(sky.h * sky.dpr);
+  cv.style.width = sky.w + "px";
+  cv.style.height = sky.h + "px";
+  sky.ctx.setTransform(sky.dpr, 0, 0, sky.dpr, 0, 0);
+}
+function spawnMeteor() {
+  // starts above the top edge, drifts down at a slight angle.
+  // speeds are px/second so the streak is readable, not a 3-frame blink
+  const angle = (0.14 + Math.random() * 0.16) * (Math.random() < 0.5 ? 1 : -1);
+  const speed = 300 + Math.random() * 240;
+  const x = Math.random() * (sky.w + 300) - 150;
+  sky.bits.push({
+    x: x,
+    y: -30 - Math.random() * 120,
+    vx: Math.sin(angle) * speed,
+    vy: Math.cos(angle) * speed,
+    len: 110 + Math.random() * 170,
+    w: 0.9 + Math.random() * 0.7,
+    a: 0.55 + Math.random() * 0.45,
+    age: 0
+  });
+}
+function drawSky(now) {
+  const ctx = sky.ctx;
+  const dt = Math.min(48, now - sky.last || 16);
+  sky.last = now;
+  ctx.clearRect(0, 0, sky.w, sky.h);
+
+  if (now >= sky.next) {
+    spawnMeteor();
+    sky.next = now + 900 + Math.random() * 2300;
+  }
+
+  ctx.lineCap = "round";
+  for (let i = 0; i < sky.bits.length; i++) {
+    const b = sky.bits[i];
+    b.x += b.vx * dt / 1000;
+    b.y += b.vy * dt / 1000;
+    b.age += dt;
+    // quick fade in, long readable streak, soft taper at the end
+    const fadeIn = Math.min(1, b.age / 140);
+    const fadeOut = 1 - Math.min(1, Math.max(0, b.age - 1500) / 1400);
+    const life = fadeIn * fadeOut;
+    if (life <= 0.02 || b.y > sky.h + 220) { sky.bits.splice(i, 1); i--; continue; }
+
+    const len = b.len * Math.min(1, b.age / 200);
+    const tailX = b.x - (b.vx / Math.hypot(b.vx, b.vy)) * len;
+    const tailY = b.y - (b.vy / Math.hypot(b.vx, b.vy)) * len;
+
+    const g = ctx.createLinearGradient(tailX, tailY, b.x, b.y);
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(0.55, "rgba(255,255,255," + (0.16 * life * b.a).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(255,255,255," + (0.9 * life * b.a).toFixed(3) + ")");
+    ctx.strokeStyle = g;
+    ctx.lineWidth = b.w;
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+
+    // bright head
+    const hg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, 7);
+    hg.addColorStop(0, "rgba(255,255,255," + (0.85 * life * b.a).toFixed(3) + ")");
+    hg.addColorStop(0.4, "rgba(255,255,255," + (0.28 * life * b.a).toFixed(3) + ")");
+    hg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  sky.raf = requestAnimationFrame(drawSky);
+}
+function startSky() {
+  if (sky.running || !sky.cv) return;
+  sky.running = true;
+  sky.last = performance.now();
+  sky.next = sky.last + 400;
+  sky.raf = requestAnimationFrame(drawSky);
+}
+function stopSky() {
+  if (!sky.running) return;
+  sky.running = false;
+  cancelAnimationFrame(sky.raf);
+  sky.bits.length = 0;
+  if (sky.ctx) sky.ctx.clearRect(0, 0, sky.w, sky.h);
+}
+function updateSky() {
+  if (skyOn()) { skySize(); startSky(); } else { stopSky(); }
+}
+
 let toastTimer;
 function toast(msg, type) {
   const t = $("#toast");
@@ -500,8 +668,11 @@ function toast(msg, type) {
 
 function publicUrl(path) { return CONFIG.supabaseUrl + "/storage/v1/object/public/" + BUCKET + "/" + path.split("/").map(encodeURIComponent).join("/"); }
 function subjectName(id) { const s = SUBJECTS.find((x) => x.id === id); return s ? s.name : id; }
-function subjectIcon(id) { const s = SUBJECTS.find((x) => x.id === id); return s ? (s.icon || "") : ""; }
-function fileLabel(r) { return (r && r.name && r.name.trim()) ? r.name : ("الملف " + r.week); }
+
+/* week 0 = uploaded without picking a week */
+const NO_WEEK = 0;
+function weekLabel(w) { return Number(w) === NO_WEEK ? "بدون تحديد أسبوع" : "أسبوع " + w; }
+function fileLabel(r) { return (r && r.name && r.name.trim()) ? r.name : ("الملف " + weekLabel(r.week)); }
 function fileSize(bytes) {
   if (!bytes && bytes !== 0) return "";
   if (bytes < 1024) return bytes + " بايت";
@@ -523,6 +694,7 @@ function storageKeyName(name) {
 async function downloadFile(r) {
   const name = downloadName(r);
   const url = publicUrl(r.path);
+  markRead(r.id);
   const dl = $("#dlBtn");
   if (dl) dl.classList.add("busy");
   toast("جاري تجهيز الملف للتحميل...");
@@ -541,7 +713,7 @@ async function downloadFile(r) {
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(href); a.remove(); }, 4000);
-    toast("تم إرسال الملف للتحميل ✅");
+    toast("تم إرسال الملف للتحميل.");
   } catch (e) {
     const a = document.createElement("a");
     a.href = url;
@@ -564,11 +736,11 @@ async function loadRows() {
   );
   const tag = $("#connStatus");
   if (res.error) {
-    if (tag) tag.innerHTML = "❌ <b>مفيش اتصال بسيرفر الملفات.</b> جرّب Wi-Fi بدل بيانات الموبايل، واقفِل أي VPN أو فلتر.";
+    if (tag) tag.innerHTML = "<b>مفيش اتصال بسيرفر الملفات.</b> جرّب Wi-Fi بدل بيانات الموبايل، واقفِل أي VPN أو فلتر.";
     toast("تعذر تحميل الملفات", "err");
     return;
   }
-  if (tag) tag.innerHTML = "✅ <b>الاتصال بالسيرفر شغال.</b> (" + (res.data || []).length + " ملف)";
+  if (tag) tag.innerHTML = "<b>الاتصال بالسيرفر شغال.</b> (" + (res.data || []).length + " ملف)";
   rows = res.data || [];
 }
 
@@ -588,16 +760,23 @@ function render() {
 function renderHome(view) {
   $("#pageTitle").textContent = "المواد الدراسية";
   $("#backBtn").style.display = "none";
-  view.appendChild(el("p", "sub-title", "اختر المادة عشان تشوف ملفات الأسابيع."));
+  const total = rows.length;
+  view.appendChild(el("p", "sub-title", total
+    ? "اختر المادة عشان تشوف ملفاتها. النقطة جنب المادة معناها فيه ملف جديد من أول ما فتحت."
+    : "اختر المادة عشان تشوف ملفاتها."));
   const grid = el("div", "grid");
   SUBJECTS.forEach((s) => {
     const c = el("button", "card");
     c.type = "button";
-    c.appendChild(el("span", "dot", s.icon || "•"));
+    c.appendChild(el("span", "dot"));
     c.appendChild(el("span", null, s.name));
     const count = rows.filter((r) => r.subject === s.id).length;
     c.appendChild(el("span", "cnt", count ? count + " ملف" : "فارغة"));
-    c.addEventListener("click", () => { playClick("open"); state = { view: "subject", subject: s.id }; window.scrollTo(0, 0); render(); });
+    if (hasNewIn(s.id)) {
+      c.appendChild(el("span", "newdot"));
+      c.setAttribute("aria-label", s.name + " — فيه ملف جديد");
+    }
+    c.addEventListener("click", () => { state = { view: "subject", subject: s.id }; window.scrollTo(0, 0); render(); });
     grid.appendChild(c);
   });
   stagger(grid.children, 40);
@@ -605,10 +784,14 @@ function renderHome(view) {
 }
 
 function renderSubject(view, id) {
-  const list = rows.filter((r) => r.subject === id).sort((a, b) => (b.week - a.week) || (new Date(b.created_at) - new Date(a.created_at)));
+  const list = rows.filter((r) => r.subject === id)
+    .sort((a, b) => (b.week - a.week) || (new Date(b.created_at) - new Date(a.created_at)));
   $("#pageTitle").textContent = subjectName(id);
   $("#backBtn").style.display = "inline-flex";
   view.appendChild(el("p", "sub-title", list.length ? "الأسابيع (الأحدث فوق)." : "لسه مفيش ملفات مرفوعة للمادة دي."));
+
+  // entering the subject clears its card dot; per-file dots stay until opened
+  markVisited(id);
 
   if (!list.length) { view.appendChild(el("div", "empty", "مفيش ملفات هنا حاليًا. ارفع ملفات من الإعدادات.")); return; }
 
@@ -619,7 +802,8 @@ function renderSubject(view, id) {
     const items = list.filter((r) => r.week === w);
     const block = el("div", "week");
     const head = el("div", "week-head");
-    head.appendChild(el("span", "n", "أسبوع " + w));
+    head.appendChild(el("span", "n", weekLabel(w)));
+    head.appendChild(el("span", "rule"));
     head.appendChild(el("span", null, items.length + " ملف"));
     block.appendChild(head);
     const box = el("div", "list");
@@ -631,13 +815,19 @@ function renderSubject(view, id) {
 }
 
 function fileRow(r) {
-  const row = el("div", "row");
+  const fresh = isUnread(r);
+  const row = el("div", "row" + (fresh ? " unread" : ""));
   const meta = el("div", "meta");
   meta.appendChild(el("b", null, fileLabel(r)));
   const when = new Date(r.created_at).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
   const size = r.size ? " · " + fileSize(r.size) : "";
   meta.appendChild(el("small", null, when + size));
   row.appendChild(meta);
+  if (fresh) {
+    const d = el("span", "newdot");
+    d.title = "لسه ما فتحتهوش";
+    row.appendChild(d);
+  }
 
   const acts = el("div", "acts");
   const open = el("button", "btn small", "فتح");
@@ -660,6 +850,7 @@ function fileRow(r) {
 /* ---------- pdf viewer ---------- */
 function openViewer(r) {
   current = r;
+  markRead(r.id);
   const url = publicUrl(r.path);
   $("#viewerTitle").textContent = subjectName(r.subject) + " — " + fileLabel(r);
   const dl = $("#dlBtn");
@@ -673,6 +864,7 @@ function openViewer(r) {
   $("#viewerFrame").src = url + "#view=FitH";
   $("#viewer").style.display = "flex";
   document.body.style.overflow = "hidden";
+  render();
 }
 function closeViewer() {
   $("#viewer").style.display = "none";
@@ -681,28 +873,16 @@ function closeViewer() {
 }
 function setZoom(z) {
   zoom = Math.min(200, Math.max(50, z));
-  $("#zoomLabel").textContent = zoom + "%";
-  const w = Math.round(($("#viewerBody").clientWidth - 24) * (zoom / 100));
-  $("#viewerFrame").style.width = Math.max(320, w) + "px";
-  $("#viewerFrame").style.height = "100%";
-  $("#viewerFrame").style.margin = "0 auto";
-  $("#viewerFrame").style.display = "block";
-}
-
-/* ---------- password ---------- */
-function checkPassword() {
-  const v = $("#passIn").value;
-  if (v === CONFIG.uploadPassword) { authed = true; return true; }
-  return false;
-}
-function requirePassword(cb) {
-  if (authed) { cb(); return; }
-  $("#passIn").value = "";
-  $("#passStatus").textContent = "";
-  $("#passDlg").showModal();
-  const onOk = () => { if (checkPassword()) { authed = true; $("#passDlg").close(); cb(); } else { $("#passStatus").textContent = "كلمة المرور غير صحيحة"; } };
-  $("#verifyBtn").onclick = onOk;
-  $("#passIn").onkeydown = (e) => { if (e.key === "Enter") onOk(); };
+  const label = $("#zoomLabel");
+  if (label) label.textContent = zoom + "%";
+  const wrap = $("#viewerFrameWrap");
+  const frame = $("#viewerFrame");
+  if (!wrap || !frame) return;
+  const avail = Math.max(320, wrap.clientWidth - 24);
+  frame.style.width = Math.max(320, Math.round(avail * (zoom / 100))) + "px";
+  frame.style.height = "100%";
+  frame.style.margin = "0 auto";
+  frame.style.display = "block";
 }
 
 /* ---------- delete ---------- */
@@ -717,12 +897,22 @@ async function doDelete(r) {
   if (res.error) { toast("فشل الحذف: " + res.error.message, "err"); return; }
   await withTimeout(sb.storage.from(BUCKET).remove([r.path]), 20000, { error: { message: "انتهت المهلة" } });
   toast("تم الحذف");
+  const v = getSeen();
+  delete v.read[r.id];
+  saveSeen(v);
   await loadRows();
   render();
 }
 
 /* ---------- upload ---------- */
-const MAX_UPLOAD_BYTES = 50 * 1048576;
+const MAX_UPLOAD_BYTES = 70 * 1048576;
+const RESUMABLE_MIN_BYTES = 6 * 1048576;
+const UPLOAD_TIMEOUT_BASE = 90000;
+const UPLOAD_TIMEOUT_PER_MB = 20000;
+function uploadTimeoutFor(bytes) {
+  const mb = (bytes || 0) / 1048576;
+  return Math.min(600000, Math.round(UPLOAD_TIMEOUT_BASE + mb * UPLOAD_TIMEOUT_PER_MB));
+}
 
 function uploadHint(err) {
   const raw = ((err && err.message) || "").trim();
@@ -735,7 +925,7 @@ function uploadHint(err) {
   if (m.indexOf("row-level security") >= 0)
     return ["الموقع مش مسموح له يكتب في القاعدة. اعمل تحديث للصفحة (سحب لتحت) وجرّب تاني.", raw];
   if (m.indexOf("maximum allowed size") >= 0 || m.indexOf("too large") >= 0)
-    return ["الملف كبير أوي على الحد المسموح (تقريبًا 50 ميجا). صغّره وجرّب.", raw];
+    return ["الملف كبير أوي على الحد المسموح من السيرفر. صغّره وجرّب.", raw];
   if (m.indexOf("timeout") >= 0 || m.indexOf("انتهت مهلة") >= 0)
     return ["الاتصال بطيء والوقت خلص قبل ما الملف يوصل. جرّب تاني أو صغّر الملف.", raw];
   if (m.indexOf("already exists") >= 0)
@@ -757,19 +947,33 @@ function showUploadError(st, err) {
   }
 }
 
+let uploadIdSeq = 0;
+function nextUploadId(path) {
+  uploadIdSeq += 1;
+  return Math.floor(Date.now()).toString(36) + "-" + uploadIdSeq + "-" + Math.floor(Math.random() * 1e9).toString(36);
+}
+
 async function uploadWithRetry(path, file, attempts) {
+  const big = (file.size || 0) >= RESUMABLE_MIN_BYTES;
+  const modes = big ? [true, false] : [false];
   let last = null;
-  for (let i = 0; i < attempts; i++) {
-    const res = await withTimeout(
-      sb.storage.from(BUCKET).upload(path, file, { contentType: "application/pdf", upsert: true }),
-      90000, { error: { message: "انتهت مهلة الرفع" } }
-    );
-    if (!res.error) return res;
-    last = res.error;
-    const m = String((last && last.message) || "").toLowerCase();
-    const retriable = m.indexOf("fetch") >= 0 || m.indexOf("network") >= 0 || m.indexOf("load failed") >= 0 || m.indexOf("timeout") >= 0 || m.indexOf("انتهت مهلة") >= 0;
-    if (!retriable) break;
-    await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+  for (const resumable of modes) {
+    const uploadId = resumable ? nextUploadId(path) : null;
+    for (let i = 0; i < attempts; i++) {
+      const opts = { contentType: "application/pdf", upsert: true };
+      if (resumable) opts.uploadId = uploadId;
+      const res = await withTimeout(
+        sb.storage.from(BUCKET).upload(path, file, opts),
+        uploadTimeoutFor(file.size),
+        { error: { message: "انتهت مهلة الرفع" } }
+      );
+      if (!res.error) return res;
+      last = res.error;
+      const m = String((last && last.message) || "").toLowerCase();
+      const retriable = m.indexOf("fetch") >= 0 || m.indexOf("network") >= 0 || m.indexOf("load failed") >= 0 || m.indexOf("timeout") >= 0 || m.indexOf("انتهت مهلة") >= 0 || m.indexOf("econnreset") >= 0 || m.indexOf("socket") >= 0;
+      if (!retriable) break;
+      await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+    }
   }
   return { error: last };
 }
@@ -777,15 +981,19 @@ async function uploadWithRetry(path, file, attempts) {
 async function doUpload() {
   const st = $("#upStatus");
   const subject = $("#upSubject").value;
-  const week = Math.floor(Number($("#upWeek").value));
+  const rawWeek = ($("#upWeek").value || "").trim();
+  const week = rawWeek === "" ? NO_WEEK : Math.floor(Number(rawWeek));
   const file = $("#upFile").files[0];
   const typedName = ($("#upName").value || "").trim();
   if (!subject) { st.textContent = "اختر المادة."; return; }
-  if (!week || week < 1 || week > 52) { st.textContent = "اكتب رقم أسبوع من 1 إلى 52."; return; }
+  if (rawWeek !== "" && (!Number.isFinite(week) || week < 1 || week > 52)) {
+    st.textContent = "رقم الأسبوع لازم يكون من 1 إلى 52، أو سيبه فاضي.";
+    return;
+  }
   if (!file) { st.textContent = "اختر ملف PDF."; return; }
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { st.textContent = "الملف لازم يكون PDF."; return; }
   if (file.size > MAX_UPLOAD_BYTES) {
-    st.textContent = "حجم الملف " + fileSize(file.size) + " وده أكبر من الحد (50 ميجا). صغّره وجرّب تاني.";
+    st.textContent = "حجم الملف " + fileSize(file.size) + " وده أكبر من الحد (70 ميجا). صغّره وجرّب تاني.";
     return;
   }
 
@@ -793,7 +1001,8 @@ async function doUpload() {
   btn.disabled = true;
   st.textContent = "جاري الرفع... (" + fileSize(file.size) + ")";
 
-  const path = subject + "/" + week + "-" + Date.now() + "-" + storageKeyName(file.name);
+  const slug = week === NO_WEEK ? "nw" : String(week);
+  const path = subject + "/" + slug + "-" + Date.now() + "-" + storageKeyName(file.name);
   const label = typedName || file.name.replace(/\.pdf$/i, "");
 
   const up = await uploadWithRetry(path, file, 3);
@@ -809,8 +1018,10 @@ async function doUpload() {
   $("#upFile").value = "";
   $("#upName").value = "";
   $("#upWeek").value = "";
-  st.textContent = "تم الرفع ✅ Filename: " + label;
+  st.textContent = "تم الرفع: " + label;
   toast("تم رفع " + label);
+  // the uploader has obviously seen their own file
+  if (save.data && save.data[0]) { markVisited(subject); markRead(save.data[0].id); }
   await loadRows();
   render();
 }
@@ -818,6 +1029,13 @@ async function doUpload() {
 function init() {
   initLook();
   $("#buildTag").textContent = "إصدار الصفحة: " + BUILD;
+  $("#versionTag").textContent = VERSION;
+
+  sky.cv = $("#sky");
+  sky.ctx = sky.cv ? sky.cv.getContext("2d") : null;
+  updateSky();
+  window.addEventListener("resize", () => { if (skyOn()) skySize(); });
+  document.addEventListener("visibilitychange", updateSky);
 
   $("#backBtn").addEventListener("click", () => { state = { view: "home", subject: null }; window.scrollTo(0, 0); render(); });
   $("#settingsBtn").addEventListener("click", () => { applyLook(); $("#setDlg").showModal(); });
@@ -835,7 +1053,6 @@ function init() {
   };
   pickSeg("#styleSeg", "style", "data-style-val");
   pickSeg("#themeSeg", "theme", "data-theme-val");
-  pickSeg("#soundSeg", "sound", "data-sound-val");
 
   $("#openUploadDlg").addEventListener("click", () => {
     requirePassword(() => { $("#setDlg").close(); setTimeout(() => $("#upDlg").showModal(), 120); });
@@ -845,9 +1062,8 @@ function init() {
 
   $("#dlBtn").addEventListener("click", (e) => {
     e.preventDefault();
-    const p = $("#dlBtn").dataset.path;
-    if (!p || !current) return;
-    downloadFile({ path: p, name: $("#dlBtn").dataset.name, week: current.week, subject: current.subject });
+    if (!current) return;
+    downloadFile(current);
   });
 
   $("#viewerClose").addEventListener("click", closeViewer);
