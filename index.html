@@ -61,12 +61,13 @@ body{
 }
 body>*{position:relative;z-index:1}
 
-/* falling meteors (dark mode only, driven by JS) */
+/* starfield + falling meteors (JS-driven, both themes) */
 #sky{
   position:fixed;inset:0;z-index:0;pointer-events:none;
   opacity:0;transition:opacity .6s ease;
 }
 html[data-theme="dark"] #sky{opacity:1}
+html[data-theme="light"] #sky{opacity:.85}
 
 button{font-family:inherit;cursor:pointer}
 .wrap{max-width:1000px;margin:0 auto;padding:0 16px}
@@ -420,7 +421,7 @@ const CONFIG = {
 
 const SUBJECTS = CONFIG.subjects;
 const BUCKET = "pdfs";
-const BUILD = "r5-2026-10-07";
+const BUILD = "r7-2026-10-08";
 const VERSION = "1.0 Beta";
 const LS_SETTINGS = "matarij.settings";
 const LS_SEEN = "matarij.seen";
@@ -552,13 +553,16 @@ function scheduleLightning() {
   }, 6000 + Math.random() * 9000);
 }
 
-/* ---------- falling meteors (dark mode) ---------- */
+/* ---------- starfield + falling meteors ---------- */
 const sky = {
   cv: null, ctx: null, w: 0, h: 0, dpr: 1,
-  bits: [], raf: 0, last: 0, next: 0, running: false
+  bits: [], stars: [], raf: 0, last: 0, next: 0, running: false
 };
-function skyOn() {
-  return document.documentElement.dataset.theme === "dark" && !reduceMotion() && !document.hidden;
+function isDark() { return document.documentElement.dataset.theme === "dark"; }
+function skyOn() { return !reduceMotion() && !document.hidden; }
+/* colour per theme: white on dark, deep red on light so it reads */
+function tone(alpha) {
+  return (isDark() ? "255,255,255," : "185,28,28,") + (+alpha).toFixed(3);
 }
 function skySize() {
   const cv = sky.cv;
@@ -571,23 +575,68 @@ function skySize() {
   cv.style.width = sky.w + "px";
   cv.style.height = sky.h + "px";
   sky.ctx.setTransform(sky.dpr, 0, 0, sky.dpr, 0, 0);
+  // density is tied to size, so rebuild when the window changes meaningfully
+  if (!sky.stars.length || Math.abs(sky.w - (sky.starsW || 0)) > 60) {
+    sky.starsW = sky.w;
+    buildStars();
+  }
+}
+/* ---- stars: each twinkles on its own slow rhythm ---- */
+function buildStars() {
+  const area = sky.w * sky.h;
+  const count = Math.max(60, Math.min(220, Math.round(area / 7000)));
+  sky.stars = [];
+  for (let i = 0; i < count; i++) {
+    sky.stars.push({
+      x: Math.random() * sky.w,
+      y: Math.random() * sky.h,
+      r: 0.5 + Math.random() * 1.2,
+      base: 0.3 + Math.random() * 0.55,
+      // negative phase so they do not all blink together
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.25 + Math.random() * 0.75,
+      // seconds per brightness swell
+      swell: 7 + Math.random() * 13
+    });
+  }
+}
+function drawStars(t) {
+  const ctx = sky.ctx;
+  for (let i = 0; i < sky.stars.length; i++) {
+    const s = sky.stars[i];
+    // gentle twinkle, plus a slow swell that brightens a star then lets it settle
+    const twinkle = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * s.sp + s.ph));
+    const cycle = (t + s.ph * 6) / s.swell;
+    const frac = cycle - Math.floor(cycle);
+    let boost = 1;
+    if (frac < 0.18) boost = 1 + 1.5 * (frac / 0.18);
+    else if (frac < 0.42) boost = 2.5 - 1.5 * ((frac - 0.18) / 0.24);
+    const a = Math.min(1, s.base * twinkle * boost);
+    const r = s.r * (a > s.base * 1.4 ? 1.25 : 1);
+    ctx.fillStyle = "rgba(" + (isDark() ? "255,255,255," : "120,20,20,") + (+a).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 function spawnMeteor() {
-  // starts above the top edge, drifts down at a slight angle.
-  // speeds are px/second so the streak is readable, not a 3-frame blink
-  const angle = (0.14 + Math.random() * 0.16) * (Math.random() < 0.5 ? 1 : -1);
-  const speed = 300 + Math.random() * 240;
-  const x = Math.random() * (sky.w + 300) - 150;
-  sky.bits.push({
+  // top-right -> bottom-left, matching the RTL reading direction
+  const angle = 0.12 + Math.random() * 0.1;
+  const speed = 150 + Math.random() * 110;
+  // starts off the top-right corner
+  const x = sky.w * (0.45 + Math.random() * 0.6);
+  const m = {
     x: x,
-    y: -30 - Math.random() * 120,
-    vx: Math.sin(angle) * speed,
+    y: -40 - Math.random() * 140,
+    vx: -Math.sin(angle) * speed,
     vy: Math.cos(angle) * speed,
-    len: 110 + Math.random() * 170,
-    w: 0.9 + Math.random() * 0.7,
-    a: 0.55 + Math.random() * 0.45,
+    len: 70 + Math.random() * 90,
+    w: 0.9 + Math.random() * 0.5,
+    a: 0.62 + Math.random() * 0.32,
     age: 0
-  });
+  };
+  sky.bits.push(m);
+  return m;
 }
 function drawSky(now) {
   const ctx = sky.ctx;
@@ -595,9 +644,24 @@ function drawSky(now) {
   sky.last = now;
   ctx.clearRect(0, 0, sky.w, sky.h);
 
+  drawStars(now / 1000);
+
   if (now >= sky.next) {
-    spawnMeteor();
-    sky.next = now + 900 + Math.random() * 2300;
+    // small clusters of 2-3, spaced close together in time and space
+    const groupSize = 2 + Math.floor(Math.random() * 2);
+    const head = spawnMeteor();
+    for (let k = 1; k < groupSize; k++) {
+      sky.bits.push(Object.assign({}, head, {
+        x: head.x + (Math.random() * 260 + 40),
+        y: head.y - Math.random() * 200 - 20,
+        vx: head.vx * (0.86 + Math.random() * 0.22),
+        vy: head.vy * (0.84 + Math.random() * 0.24),
+        len: head.len * (0.8 + Math.random() * 0.3),
+        age: -Math.random() * 180
+      }));
+    }
+    // sporadic: long quiet gaps, then a burst
+    sky.next = now + (Math.random() < 0.35 ? 900 + Math.random() * 1400 : 4200 + Math.random() * 6500);
   }
 
   ctx.lineCap = "round";
@@ -606,20 +670,20 @@ function drawSky(now) {
     b.x += b.vx * dt / 1000;
     b.y += b.vy * dt / 1000;
     b.age += dt;
-    // quick fade in, long readable streak, soft taper at the end
-    const fadeIn = Math.min(1, b.age / 140);
-    const fadeOut = 1 - Math.min(1, Math.max(0, b.age - 1500) / 1400);
+    // gentle fade in, long quiet drift, soft taper at the end
+    const fadeIn = Math.min(1, b.age / 260);
+    const fadeOut = 1 - Math.min(1, Math.max(0, b.age - 2600) / 1600);
     const life = fadeIn * fadeOut;
     if (life <= 0.02 || b.y > sky.h + 220) { sky.bits.splice(i, 1); i--; continue; }
 
-    const len = b.len * Math.min(1, b.age / 200);
+    const len = b.len * Math.min(1, b.age / 340);
     const tailX = b.x - (b.vx / Math.hypot(b.vx, b.vy)) * len;
     const tailY = b.y - (b.vy / Math.hypot(b.vx, b.vy)) * len;
 
     const g = ctx.createLinearGradient(tailX, tailY, b.x, b.y);
-    g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(0.55, "rgba(255,255,255," + (0.16 * life * b.a).toFixed(3) + ")");
-    g.addColorStop(1, "rgba(255,255,255," + (0.9 * life * b.a).toFixed(3) + ")");
+    g.addColorStop(0, "rgba(" + tone(0) + ")");
+    g.addColorStop(0.55, "rgba(" + tone(0.14 * life * b.a) + ")");
+    g.addColorStop(1, "rgba(" + tone(0.62 * life * b.a) + ")");
     ctx.strokeStyle = g;
     ctx.lineWidth = b.w;
     ctx.beginPath();
@@ -627,14 +691,14 @@ function drawSky(now) {
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
 
-    // bright head
-    const hg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, 7);
-    hg.addColorStop(0, "rgba(255,255,255," + (0.85 * life * b.a).toFixed(3) + ")");
-    hg.addColorStop(0.4, "rgba(255,255,255," + (0.28 * life * b.a).toFixed(3) + ")");
-    hg.addColorStop(1, "rgba(255,255,255,0)");
+    // small soft head, not a flare
+    const hg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, 4);
+    hg.addColorStop(0, "rgba(" + tone(0.5 * life * b.a) + ")");
+    hg.addColorStop(0.4, "rgba(" + tone(0.16 * life * b.a) + ")");
+    hg.addColorStop(1, "rgba(" + tone(0) + ")");
     ctx.fillStyle = hg;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, 7, 0, Math.PI * 2);
+    ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
     ctx.fill();
   }
   sky.raf = requestAnimationFrame(drawSky);
